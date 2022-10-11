@@ -5,9 +5,10 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"github.com/gorilla/css/scanner"
 	"io"
+	"io/ioutil"
 	"strings"
-	"text/scanner"
 )
 
 type tokenType int
@@ -28,7 +29,7 @@ type Rule string
 
 type tokenEntry struct {
 	value string
-	pos   scanner.Position
+	token *scanner.Token
 }
 
 type tokenizer struct {
@@ -50,31 +51,19 @@ func (e tokenEntry) typ() tokenType {
 	return newTokenType(e.value)
 }
 
-func (t *tokenizer) next() (tokenEntry, error) {
-	token := t.s.Scan()
-	if token == scanner.EOF {
-		return tokenEntry{}, errors.New("EOF")
+func (t *tokenizer) next() (*tokenEntry, error) {
+	token := t.s.Next()
+	if token == nil || token.Type == scanner.TokenEOF {
+		return &tokenEntry{}, errors.New("EOF")
 	}
-	value := t.s.TokenText()
-	pos := t.s.Pos()
-	if newTokenType(value).String() == "STYLE_SEPARATOR" {
-		t.s.IsIdentRune = func(ch rune, i int) bool { // property value can contain spaces
-			if ch == -1 || ch == '\n' || ch == '\t' || ch == ':' || ch == ';' {
-				return false
-			}
-			return true
-		}
-	} else {
-		t.s.IsIdentRune = func(ch rune, i int) bool { // other tokens can't contain spaces
-			if ch == -1 || ch == '.' || ch == '#' || ch == '\n' || ch == ' ' || ch == '\t' || ch == ':' || ch == ';' {
-				return false
-			}
-			return true
-		}
-	}
-	return tokenEntry{
-		value: value,
-		pos:   pos,
+
+	//if token.Type == scanner.TokenS {
+	//	return nil, nil
+	//}
+
+	return &tokenEntry{
+		value: token.Value,
+		token: token,
 	}, nil
 }
 
@@ -111,8 +100,9 @@ func newTokenType(typ string) tokenType {
 }
 
 func newTokenizer(r io.Reader) *tokenizer {
-	s := &scanner.Scanner{}
-	s.Init(r)
+	data, _ := ioutil.ReadAll(r)
+	s := scanner.New(string(data))
+
 	return &tokenizer{
 		s: s,
 	}
@@ -126,8 +116,16 @@ func buildList(r io.Reader) *list.List {
 		if err != nil {
 			break
 		}
-		l.PushBack(token)
+		if token != nil {
+			l.PushBack(token)
+		}
 	}
+
+	//el := l.Front()
+	//for ; el != nil; el = el.Next() {
+	//	log.Println(el.Value.(*tokenEntry).token.Type, el.Value.(*tokenEntry).token.Value)
+	//}
+
 	return l
 }
 
@@ -152,9 +150,15 @@ func parse(l *list.List) (map[Rule]map[string]string, error) {
 	)
 
 	for e := l.Front(); e != nil; e = l.Front() {
-		token := e.Value.(tokenEntry)
+		token := e.Value.(*tokenEntry)
+		typ := token.typ()
 		l.Remove(e)
-		switch token.typ() {
+
+		if token.token.Type == scanner.TokenS {
+			continue
+		}
+
+		switch typ {
 		case tokenValue:
 			//fmt.Printf("typ: %v, value: %q, prevToken: %v\n", token.typ(), token.value, prevToken)
 			switch prevToken {
@@ -169,24 +173,24 @@ func parse(l *list.List) (map[Rule]map[string]string, error) {
 			case tokenValue:
 				rule = append(rule, token.value)
 			default:
-				return css, fmt.Errorf("line %d: invalid syntax", token.pos.Line)
+				return css, fmt.Errorf("line %d: invalid syntax", token.token.Line)
 			}
 		case tokenSelector:
 			selector = token.value
 		case tokenBlockStart:
 			if prevToken != tokenValue {
-				return css, fmt.Errorf("line %d: block is missing rule identifier", token.pos.Line)
+				return css, fmt.Errorf("line %d: block is missing rule identifier", token.token.Line)
 			}
 			isBlock = true
 		case tokenStatementEnd:
 			//fmt.Printf("prevToken: %v, style: %v, value: %v\n", prevToken, style, value)
 			if prevToken != tokenValue || style == "" || value == "" {
-				return css, fmt.Errorf("line %d: expected style before semicolon", token.pos.Line)
+				return css, fmt.Errorf("line %d: expected style before semicolon", token.token.Line)
 			}
 			styles[style] = value
 		case tokenBlockEnd:
 			if !isBlock {
-				return css, fmt.Errorf("line %d: rule block ends without a beginning", token.pos.Line)
+				return css, fmt.Errorf("line %d: rule block ends without a beginning", token.token.Line)
 			}
 			for i := range rule {
 				oldRule, ok := css[Rule(rule[i])]

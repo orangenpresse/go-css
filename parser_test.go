@@ -107,14 +107,14 @@ rule2 {
 	})
 	t.Run("PropertyWithSpace", func(t *testing.T) {
 		ex1 := `body {
-		font-family: 'Zil', serif;
+		font-family: 'Zil, serif';
 }`
 		css, err := Unmarshal([]byte(ex1))
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if css["body"]["font-family"] != "'Zil', serif" {
+		if css["body"]["font-family"] != "'Zil, serif'" {
 			t.Fatalf("invalid rule 'font-family', got %q", css["body"]["font-family"])
 		}
 	})
@@ -194,6 +194,26 @@ func TestParseSelectorGroup(t *testing.T) {
 	}
 	if _, ok := css["rule3"]; !ok {
 		t.Fatal("Missing '.rule3' rule")
+	}
+
+}
+
+func TestMultipleSelectorGroups(t *testing.T) {
+	ex1 := `.rule1, .rule2 {
+		style1: value1;
+		style2: value2;
+}`
+
+	css, err := Unmarshal([]byte(ex1))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := css[".rule1"]; !ok {
+		t.Fatal("Missing '.rule1' rule")
+	}
+	if _, ok := css[".rule2"]; !ok {
+		t.Fatal("Missing '#rule2' rule")
 	}
 
 }

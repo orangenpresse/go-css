@@ -1,23 +1,22 @@
 # go-css
 
-[![Build Status](https://travis-ci.org/napsy/go-css.svg?branch=master)](https://travis-ci.org/napsy/go-css)
-[![Software License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/vendor/package/blob/master/LICENSE.md)
-[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/napsy/go-css)
-
-
-
 This parser understands simple CSS and comes with a basic CSS syntax checker.
+
+Fork from: https://godoc.org/github.com/napsy/go-css
+
+### Improvements
+* Switched scanner to gorilla css scanner for better token recognition
 
 
 ```
-go get github.com/napsy/go-css
+go get github.com/orangenpresse/go-css
 ```
 
 Example usage:
 
 ```go
 
-import "github.com/napsy/go-css"
+import "github.com/orangenpresse/go-css"
 
 ex1 := `rule {
 	style1: value1;
